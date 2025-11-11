@@ -1,5 +1,6 @@
 #include <raylib.h>
 #include <stdlib.h>
+#include <time.h>
 
 typedef struct player {
     Vector2 position;
@@ -37,6 +38,7 @@ int main()
     obstaclePtr = &obstacleSqr;
 
     InitWindow(screenWidth, screenHeight, "my game");
+    SetRandomSeed(time(NULL));
 
     SetTargetFPS(60);               // Set our game to run at 60 frames-per-second
     //--------------------------------------------------------------------------------------
@@ -50,7 +52,8 @@ int main()
             UpdateFrame(&p, obstaclePtr);
         else 
             ResetGame(&p, obstaclePtr);
-        ChangeObstacle(&obstacleSqr, &obstacleRec, &obstacleBird);
+        if (obstacleSwitch)
+            ChangeObstacle(&obstacleSqr, &obstacleRec, &obstacleBird);
         //----------------------------------------------------------------------------------
 
         // Draw
@@ -135,15 +138,11 @@ void DrawFrame(player *p, Rectangle *obstacle)
 
 void ChangeObstacle(Rectangle *obs_1, Rectangle *obs_2, Rectangle *obs_3)
 {
-    int random = 0;
-    SetRandomSeed((int) GetTime());
-    if (obstacleSwitch) {
-        random = GetRandomValue(0, 90);
-        if (random <= 30) {
-            obstaclePtr = obs_1;
-        } else if (random > 30 && random <= 60) { 
-            obstaclePtr = obs_2;
-        } else obstaclePtr = obs_3;
-        obstacleSwitch = false;
-    }
+    int random = GetRandomValue(0, 90);
+    if (random <= 30)
+        obstaclePtr = obs_1;
+    else if (random > 30 && random <= 60)
+        obstaclePtr = obs_2;
+    else obstaclePtr = obs_3;
+    obstacleSwitch = false;
 }
