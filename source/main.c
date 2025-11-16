@@ -20,6 +20,7 @@ int obstaclePosx = screenWidth;
 int obstacleSpeed = 0;
 int timePassed = 0;
 const float gravity = 0.5f;
+bool gameStart = false;
 bool canJump = true;
 bool collisionFlag = false;
 bool loseFlag = false;
@@ -37,8 +38,8 @@ void ResetGame(Player *p, Rectangle *obstacle);
 void DrawFrame(Player *p, Rectangle *obstacle);
 void ChangeObstacle(Rectangle *obs_1, Rectangle *obs_2, Rectangle *obs_3);
 
-int main()
-{
+int main() {
+
     // Initialization
     //--------------------------------------------------------------------------------------
     Player p = {500.f, 700.f, 10.f, 0, 50};
@@ -57,7 +58,6 @@ int main()
     somInicio = LoadSound("sounds/start_sound.wav");
     somGameOver = LoadSound("sounds/game_over.wav");
     somPulo = LoadSound("sounds/jumping.wav");
-    PlaySound(somInicio);
     PlayMusicStream(musicaFundo);
 
     SetTargetFPS(60);               // Set our game to run at 60 frames-per-second
@@ -67,8 +67,14 @@ int main()
     while (!WindowShouldClose())    // Detect window close button or ESC key
     {
         // Update
-        //----------------------------------------------------------------------------------
-        if (!loseFlag) 
+        //---------------------------------------------------------------------------------
+        if (!gameStart) {
+            if (IsKeyPressed(KEY_SPACE)) {
+                gameStart = true;
+                PlaySound(somInicio);
+            }
+        }
+        else if (!loseFlag) 
             UpdateFrame(&p, obstaclePtr);
         else 
             ResetGame(&p, obstaclePtr);
@@ -102,12 +108,11 @@ int main()
     return 0;
 }
 
-void UpdateFrame(Player *p, Rectangle *obstacle)
-{
+void UpdateFrame(Player *p, Rectangle *obstacle) {
     obstacle->x = obstaclePosx;
     timePassed += 1;
     pontos.score += 1;
-    if (timePassed % 600 == 0) {
+    if (timePassed % 300 == 0) {
         obstacleSpeed += 1;
     }
     if (IsKeyPressed(KEY_UP) && canJump == true) {
@@ -141,8 +146,7 @@ void UpdateFrame(Player *p, Rectangle *obstacle)
     }
 }
 
-void ResetGame(Player *p, Rectangle *obstacle)
-{
+void ResetGame(Player *p, Rectangle *obstacle) {
     if (IsKeyPressed(KEY_R)) {
         collisionFlag = false;
         loseFlag = false;
@@ -160,22 +164,24 @@ void ResetGame(Player *p, Rectangle *obstacle)
     }
 }
 
-void DrawFrame(Player *p, Rectangle *obstacle)
-{
+void DrawFrame(Player *p, Rectangle *obstacle) {
     ClearBackground(PURPLE);           
     DrawRectangle(0, floor, screenWidth, 200, BLUE);
-    DrawCircle(p->position.x, p->position.y, p->radius, WHITE);
-    DrawRectangleRec(*obstacle, RED);
-    DrawText(TextFormat("SCORE: %d", pontos.score), pontos.position.x, pontos.position.y, 50, PINK);
-    DrawText(TextFormat("HIGH SCORE: %d", highScore.score), highScore.position.x, highScore.position.y, 50, PINK);
+    if (!gameStart) 
+        DrawText("PRESS SPACE TO START!", 500, 250, 50, PINK);
+    else {
+        DrawCircle(p->position.x, p->position.y, p->radius, WHITE);
+        DrawRectangleRec(*obstacle, RED);
+        DrawText(TextFormat("SCORE: %d", pontos.score), pontos.position.x, pontos.position.y, 50, PINK);
+        DrawText(TextFormat("HIGH SCORE: %d", highScore.score), highScore.position.x, highScore.position.y, 50, PINK);
+    }
     if (collisionFlag) {
         DrawText("YOU LOSE!\nPRESS R TO RESTART", 600, 250, 50, PINK);
         loseFlag = true;
     }
 }
 
-void ChangeObstacle(Rectangle *obs_1, Rectangle *obs_2, Rectangle *obs_3)
-{
+void ChangeObstacle(Rectangle *obs_1, Rectangle *obs_2, Rectangle *obs_3) {
     int random = GetRandomValue(0, 90);
     if (random <= 30)
         obstaclePtr = obs_1;
