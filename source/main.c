@@ -118,7 +118,6 @@ void InitAudio() {
   somInicio = LoadSound("audio/start_sound.wav");
   somGameOver = LoadSound("audio/game_over.wav");
   somPulo = LoadSound("audio/jumping.wav");
-  PlayMusicStream(musicaFundo);
 }
 
 void UpdateFrame(Player* p, Rectangle* obstacle) {
