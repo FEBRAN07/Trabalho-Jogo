@@ -2,6 +2,10 @@
 #include <stdlib.h>
 #include <time.h>
 
+#define MIN_OBS_SPEED 25
+#define DEFAULT_PLAYER_POS_X 500
+#define DEFAULT_PLAYER_POS_Y 700
+
 typedef struct Player {
   Vector2 position;
   Vector2 speed;
@@ -15,9 +19,9 @@ typedef struct Score {
 
 const int screenWidth = 1600;
 const int screenHeight = 900;
-const int floor = 750;
+const int ground = screenHeight - 150;
 int obstaclePosx = screenWidth;
-int obstacleSpeed = 0;
+int obstacleSpeed = MIN_OBS_SPEED;
 int timePassed = 0;
 const float gravity = 0.5f;
 bool gameStart = false;
@@ -25,7 +29,7 @@ bool canJump = true;
 bool collisionFlag = false;
 bool loseFlag = false;
 bool obstacleSwitch = false;
-Rectangle *obstaclePtr = NULL;
+Rectangle* obstaclePtr = NULL;
 Music musicaFundo;
 Sound somInicio;
 Sound somGameOver;
@@ -33,31 +37,28 @@ Sound somPulo;
 Score pontos = {1200, 100, 0};
 Score highScore = {100, 100, 0};
 
-void UpdateFrame(Player *p, Rectangle *obstacle);
-void ResetGame(Player *p, Rectangle *obstacle);
-void DrawFrame(Player *p, Rectangle *obstacle);
-void ChangeObstacle(Rectangle *obs_1, Rectangle *obs_2, Rectangle *obs_3);
+void UpdateFrame(Player* p, Rectangle* obstacle);
+void ResetGame(Player* p, Rectangle* obstacle);
+void DrawFrame(Player* p, Rectangle* obstacle);
+void ChangeObstacle(Rectangle* obs_1, Rectangle* obs_2, Rectangle* obs_3);
+void InitAudio();
+void InitGame();
 
 int main() {
   // Initialization
   //--------------------------------------------------------------------------------------
-  Player p = {500.f, 700.f, 10.f, 0, 50};
+  Player p = {DEFAULT_PLAYER_POS_X, DEFAULT_PLAYER_POS_Y, 0, 0, 50};
 
-  Rectangle obstacleSqr = {obstaclePosx, floor - 125, 125, 125};
-  Rectangle obstacleRec = {obstaclePosx, floor - 100, 300, 100};
-  Rectangle obstacleBird = {obstaclePosx, floor - 125, 200, 50};
+  Rectangle obstacleSqr = {obstaclePosx, ground - 125, 125, 125};
+  Rectangle obstacleRec = {obstaclePosx, ground - 100, 300, 100};
+  Rectangle obstacleBird = {obstaclePosx, ground - 150, 250, 75};
 
   obstaclePtr = &obstacleSqr;
-  obstacleSpeed = 25;
 
   InitWindow(screenWidth, screenHeight, "my game");
   SetRandomSeed(time(NULL));
   InitAudioDevice();
-  musicaFundo = LoadMusicStream("sounds/background.mp3");
-  somInicio = LoadSound("sounds/start_sound.wav");
-  somGameOver = LoadSound("sounds/game_over.wav");
-  somPulo = LoadSound("sounds/jumping.wav");
-  PlayMusicStream(musicaFundo);
+  InitAudio();
 
   SetTargetFPS(60); // Set our game to run at 60 frames-per-second
   //--------------------------------------------------------------------------------------
@@ -68,13 +69,10 @@ int main() {
     // Update
     //---------------------------------------------------------------------------------
     if (!gameStart) {
-      if (IsKeyPressed(KEY_SPACE)) {
-        gameStart = true;
-        PlaySound(somInicio);
-      }
-    } else if (!loseFlag)
+      InitGame();
+    } else if (!loseFlag) {
       UpdateFrame(&p, obstaclePtr);
-    else
+    } else
       ResetGame(&p, obstaclePtr);
     if (obstacleSwitch)
       ChangeObstacle(&obstacleSqr, &obstacleRec, &obstacleBird);
@@ -83,7 +81,9 @@ int main() {
     // Draw
     //----------------------------------------------------------------------------------
     BeginDrawing();
+
     DrawFrame(&p, obstaclePtr);
+
     EndDrawing();
     //----------------------------------------------------------------------------------
   }
@@ -94,25 +94,42 @@ int main() {
   UnloadSound(somInicio);
   UnloadSound(somGameOver);
   UnloadSound(somPulo);
-  CloseAudioDevice();
   //----------------------------------------------------------------------------------
 
   // De-Initialization
   //--------------------------------------------------------------------------------------
-  CloseWindow(); // Close window and OpenGL obstacleWidthext
+  CloseAudioDevice();
+  CloseWindow(); // Close window and OpenGL context
   //--------------------------------------------------------------------------------------
 
   return 0;
 }
 
-void UpdateFrame(Player *p, Rectangle *obstacle) {
+void InitGame() {
+  if (IsKeyPressed(KEY_SPACE)) {
+    gameStart = true;
+    PlaySound(somInicio);
+    PlayMusicStream(musicaFundo);
+  }
+}
+
+void InitAudio() {
+  musicaFundo = LoadMusicStream("audio/background.mp3");
+  somInicio = LoadSound("audio/start_sound.wav");
+  somGameOver = LoadSound("audio/game_over.wav");
+  somPulo = LoadSound("audio/jumping.wav");
+  PlayMusicStream(musicaFundo);
+}
+
+void UpdateFrame(Player* p, Rectangle* obstacle) {
+  UpdateMusicStream(musicaFundo);
   obstacle->x = obstaclePosx;
   timePassed += 1;
   pontos.score += 1;
   if (timePassed % 300 == 0) {
-    obstacleSpeed += 1;
+    obstacleSpeed += 2;
   }
-  if (IsKeyPressed(KEY_UP) && canJump == true) {
+  if ((IsKeyPressed(KEY_UP) || IsKeyPressed(KEY_SPACE)) && canJump == true) {
     canJump = false;
     p->speed.y = 250;
     p->position.y -= p->speed.y;
@@ -127,9 +144,9 @@ void UpdateFrame(Player *p, Rectangle *obstacle) {
   else
     p->radius = 50;
 
-  if (p->position.y > floor - p->radius) {
+  if (p->position.y > ground - p->radius) {
     p->speed.y = 0;
-    p->position.y = floor - p->radius;
+    p->position.y = ground - p->radius;
     canJump = true;
   }
   obstaclePosx -= obstacleSpeed;
@@ -144,27 +161,28 @@ void UpdateFrame(Player *p, Rectangle *obstacle) {
   }
 }
 
-void ResetGame(Player *p, Rectangle *obstacle) {
+void ResetGame(Player* p, Rectangle* obstacle) {
   if (IsKeyPressed(KEY_R)) {
     collisionFlag = false;
     loseFlag = false;
+    obstacleSwitch = true;
     obstaclePosx = screenWidth;
     obstacle->x = obstaclePosx;
-    obstacleSpeed = 25;
+    obstacleSpeed = MIN_OBS_SPEED;
     timePassed = 0;
     if (highScore.score < pontos.score) {
       highScore.score = pontos.score;
     }
     pontos.score = 0;
-    p->position.x = 500;
-    p->position.y = 700;
+    p->position.x = DEFAULT_PLAYER_POS_X;
+    p->position.y = DEFAULT_PLAYER_POS_Y;
     PlayMusicStream(musicaFundo);
   }
 }
 
-void DrawFrame(Player *p, Rectangle *obstacle) {
+void DrawFrame(Player* p, Rectangle* obstacle) {
   ClearBackground(PURPLE);
-  DrawRectangle(0, floor, screenWidth, 200, BLUE);
+  DrawRectangle(0, ground, screenWidth, 200, BLUE);
   if (!gameStart)
     DrawText("PRESS SPACE TO START!", 500, 250, 50, PINK);
   else {
@@ -181,7 +199,7 @@ void DrawFrame(Player *p, Rectangle *obstacle) {
   }
 }
 
-void ChangeObstacle(Rectangle *obs_1, Rectangle *obs_2, Rectangle *obs_3) {
+void ChangeObstacle(Rectangle* obs_1, Rectangle* obs_2, Rectangle* obs_3) {
   int random = GetRandomValue(0, 90);
   if (random <= 30)
     obstaclePtr = obs_1;
