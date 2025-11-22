@@ -1,5 +1,6 @@
 # Trabalho-Jogo
-Jogo 2D simples escrito em C usando a biblioteca [raylib](include/raylib.h).  
+Jogo 2D simples escrito em C usando a biblioteca [raylib](include/raylib.h).
+Criado por Felipe Brandes, Fernanda Niedzwiedki e Luiz Gustavo da Silva Correa.  
 O código principal está em [source/main.c](source/main.c).
 
 Controles do jogo
