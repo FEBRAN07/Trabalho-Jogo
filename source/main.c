@@ -22,7 +22,7 @@ typedef struct Score {
 
 typedef struct Obstacle {
   Rectangle* recPtr;
-  Texture2D* TexturePtr;
+  Texture2D* texturePtr;
 } Obstacle;
 
 const int screenWidth = 1600;
@@ -37,7 +37,6 @@ const float gravity = 0.5f;
 bool gameStart = false;
 bool canJump = true;
 bool isCrouched = false;
-bool collisionFlag = false;
 bool loseFlag = false;
 bool obstacleSwitch = false;
 Obstacle obstacle;
@@ -72,6 +71,19 @@ Score highScore = {100, 100, 0};
 void UpdateFrame(Player* p, Rectangle* obstacle);
 void ResetGame(Player* p, Rectangle* obstacle);
 void DrawFrame(Player* p, Obstacle obs);
+void HandleInput(Player* p);
+void UpdateObstacle(Rectangle* obstacle);
+void UpdateScore();
+void UpdateGravity(Player* p);
+void UpdateGround();
+void ResetPlayer(Player* p);
+void ResetObstacle(Rectangle* obstacle);
+void ResetScore();
+void DrawScenery();
+void DrawPlayer(Player* p);
+void DrawObstacle(Obstacle obs);
+void DrawHUD();
+void HandleObstacleCollision(Player* p, Rectangle* obstacle);
 void ChangeObstacle(Rectangle* obs_1, Rectangle* obs_2, Rectangle* obs_3);
 void GetTexture(Image sprite, int newWidth, int newHeight, Texture* texture,
                 char* fileName);
@@ -91,7 +103,7 @@ int main() {
   Rectangle obstacleRec = {obstaclePosx, ground - 100, 300, 100};
   Rectangle obstacleBird = {obstaclePosx, ground - 150, 250, 75};
   obstacle.recPtr = &obstacleSqr;
-  obstacle.TexturePtr = &obstacleSqrTexture;
+  obstacle.texturePtr = &obstacleSqrTexture;
 
   InitWindow(screenWidth, screenHeight, "my game");
   SetRandomSeed(time(NULL));
@@ -133,7 +145,7 @@ int main() {
   UnloadTextures();
   UnloadImages();
   CloseAudioDevice();
-  CloseWindow(); // Close window and OpenGL context
+  CloseWindow();
   //--------------------------------------------------------------------------------------
 
   return 0;
@@ -214,6 +226,7 @@ void UnloadTextures() {
   UnloadTexture(playerTextureJumping);
   UnloadTexture(playerTextureFalling);
   UnloadTexture(playerTextureMov);
+  UnloadTexture(groundTexture);
   UnloadTexture(background);
   UnloadTexture(obstacleBirdTexture);
   UnloadTexture(obstacleSqrTexture);
@@ -221,25 +234,32 @@ void UnloadTextures() {
 }
 
 void UpdateFrame(Player* p, Rectangle* obstacle) {
+  UpdateGround();
   UpdateMusicStream(musicaFundo);
-  groundPosx -= groundSpeed;
-  if (groundPosx <= GROUND_END)
-    groundPosx = 0;
-  obstacle->x = obstaclePosx;
-  timePassed += 1;
-  pontos.score += 1;
-  if (timePassed % 300 == 0) {
-    obstacleSpeed += 2;
+  UpdateScore();
+  UpdateObstacle(obstacle);
+  HandleInput(p);
+  UpdateGravity(p);
+  HandleObstacleCollision(p, obstacle);
+}
+
+void ResetGame(Player* p, Rectangle* obstacle) {
+  if (IsKeyPressed(KEY_R)) {
+    ResetPlayer(p);
+    ResetObstacle(obstacle);
+    ResetScore();
+    PlayMusicStream(musicaFundo);
+    loseFlag = false;
   }
+}
+
+void HandleInput(Player* p) {
   if ((IsKeyPressed(KEY_UP) || IsKeyPressed(KEY_SPACE)) && canJump == true) {
     canJump = false;
     p->speed.y = 250;
     p->position.y -= p->speed.y;
     p->speed.y = 0;
     PlaySound(somPulo);
-  } else {
-    p->speed.y += gravity;
-    p->position.y += p->speed.y;
   }
   if (IsKeyDown(KEY_DOWN) && canJump == true) {
     p->radius = PLAYER_RADIUS / 2;
@@ -248,88 +268,130 @@ void UpdateFrame(Player* p, Rectangle* obstacle) {
     p->radius = PLAYER_RADIUS;
     isCrouched = false;
   }
+}
+
+void UpdateGravity(Player* p) {
+  p->speed.y += gravity;
+  p->position.y += p->speed.y;
   if (p->position.y > ground - p->radius) {
     p->speed.y = 0;
     p->position.y = ground - p->radius;
     canJump = true;
   }
+}
+
+void UpdateGround() {
+  groundPosx -= groundSpeed;
+  if (groundPosx <= GROUND_END)
+    groundPosx = 0;
+}
+
+void UpdateObstacle(Rectangle* obstacle) {
+  obstacle->x = obstaclePosx;
   obstaclePosx -= obstacleSpeed;
   if (obstaclePosx <= -75 - obstacle->width) {
     obstaclePosx = screenWidth;
     obstacleSwitch = true;
   }
+  if (timePassed % 300 == 0) {
+    if (obstacleSpeed < MIN_OBS_SPEED * 2)
+      obstacleSpeed += 2;
+  }
+}
+
+void UpdateScore() {
+  timePassed += 1;
+  pontos.score += 1;
+}
+
+void ResetPlayer(Player* p) {
+  p->position.x = DEFAULT_PLAYER_POS_X;
+  p->position.y = DEFAULT_PLAYER_POS_Y;
+}
+
+void ResetObstacle(Rectangle* obstacle) {
+  obstacleSwitch = true;
+  obstaclePosx = screenWidth;
+  obstacle->x = obstaclePosx;
+  obstacleSpeed = MIN_OBS_SPEED;
+}
+void ResetScore() {
+  timePassed = 0;
+  if (highScore.score < pontos.score) {
+    highScore.score = pontos.score;
+  }
+  pontos.score = 0;
+}
+
+void HandleObstacleCollision(Player* p, Rectangle* obstacle) {
   if (CheckCollisionCircleRec(p->position, p->radius, *obstacle)) {
-    collisionFlag = true;
+    loseFlag = true;
     StopMusicStream(musicaFundo);
     PlaySound(somGameOver);
   }
 }
 
-void ResetGame(Player* p, Rectangle* obstacle) {
-  if (IsKeyPressed(KEY_R)) {
-    collisionFlag = false;
-    loseFlag = false;
-    obstacleSwitch = true;
-    obstaclePosx = screenWidth;
-    obstacle->x = obstaclePosx;
-    obstacleSpeed = MIN_OBS_SPEED;
-    timePassed = 0;
-    if (highScore.score < pontos.score) {
-      highScore.score = pontos.score;
-    }
-    pontos.score = 0;
-    p->position.x = DEFAULT_PLAYER_POS_X;
-    p->position.y = DEFAULT_PLAYER_POS_Y;
-    PlayMusicStream(musicaFundo);
+void DrawFrame(Player* p, Obstacle obs) {
+  DrawScenery();
+  DrawHUD();
+  if (gameStart) {
+    DrawPlayer(p);
+    DrawObstacle(obs);
   }
 }
 
-void DrawFrame(Player* p, Obstacle obs) {
+void DrawScenery() {
   ClearBackground(SKYBLUE);
   DrawTexture(background, 0, 0, WHITE);
   DrawTexture(groundTexture, groundPosx + GROUND_END, ground, WHITE);
-  if (!gameStart)
-    DrawText("PRESS SPACE TO START!", 500, 250, 50, PINK);
-  else {
-    if (!isCrouched) {
-      if (canJump) {
-        if (timePassed % 8 == 0) {
-          DrawTexture(playerTextureMov, p->position.x - p->radius * 2,
-                      p->position.y - p->radius * 2.5, WHITE);
-        } else
-          DrawTexture(playerTextureStanding, p->position.x - p->radius * 2,
-                      p->position.y - p->radius * 2.5, WHITE);
-      } else if (p->speed.y < 5)
-        DrawTexture(playerTextureJumping, p->position.x - p->radius * 2,
-                    p->position.y - p->radius * 2.5, WHITE);
-      else if (p->speed.y < 10)
-        DrawTexture(playerTextureMov, p->position.x - p->radius * 2,
-                    p->position.y - p->radius * 2.5, WHITE);
-      else
-        DrawTexture(playerTextureFalling, p->position.x - p->radius * 2,
-                    p->position.y - p->radius * 2.5, WHITE);
-    } else if (timePassed % 6) {
+}
+
+void DrawPlayer(Player* p) {
+  if (isCrouched) {
+    if (timePassed % 6) {
       DrawTexture(playerTextureCrouchMov, p->position.x - p->radius * 3.5,
                   p->position.y - p->radius * 6.25, WHITE);
     } else
       DrawTexture(playerTextureCrouch, p->position.x - p->radius * 3.5,
                   p->position.y - p->radius * 6.25, WHITE);
-    if (obs.TexturePtr == &obstacleBirdTexture) {
-      DrawTexture(*obs.TexturePtr, obs.recPtr->x, obs.recPtr->y - 20, WHITE);
-    } else if (obs.TexturePtr == &obstacleSqrTexture) {
-      DrawTexture(*obs.TexturePtr, obs.recPtr->x - 25, obs.recPtr->y - 75,
-                  WHITE);
-    } else {
-      DrawTexture(*obs.TexturePtr, obs.recPtr->x, obs.recPtr->y - 200, WHITE);
-    }
+  } else if (canJump) {
+    if (timePassed % 8 == 0) {
+      DrawTexture(playerTextureMov, p->position.x - p->radius * 2,
+                  p->position.y - p->radius * 2.5, WHITE);
+    } else
+      DrawTexture(playerTextureStanding, p->position.x - p->radius * 2,
+                  p->position.y - p->radius * 2.5, WHITE);
+  } else if (p->speed.y < 5)
+    DrawTexture(playerTextureJumping, p->position.x - p->radius * 2,
+                p->position.y - p->radius * 2.5, WHITE);
+  else if (p->speed.y < 10)
+    DrawTexture(playerTextureMov, p->position.x - p->radius * 2,
+                p->position.y - p->radius * 2.5, WHITE);
+  else
+    DrawTexture(playerTextureFalling, p->position.x - p->radius * 2,
+                p->position.y - p->radius * 2.5, WHITE);
+}
+
+void DrawObstacle(Obstacle obs) {
+  if (obs.texturePtr == &obstacleBirdTexture) {
+    DrawTexture(*obs.texturePtr, obs.recPtr->x, obs.recPtr->y - 20, WHITE);
+  } else if (obs.texturePtr == &obstacleSqrTexture) {
+    DrawTexture(*obs.texturePtr, obs.recPtr->x - 25, obs.recPtr->y - 75, WHITE);
+  } else {
+    DrawTexture(*obs.texturePtr, obs.recPtr->x, obs.recPtr->y - 200, WHITE);
+  }
+}
+
+void DrawHUD() {
+  if (gameStart) {
     DrawText(TextFormat("SCORE: %d", pontos.score), pontos.position.x,
              pontos.position.y, 50, BLACK);
     DrawText(TextFormat("HIGH SCORE: %d", highScore.score),
              highScore.position.x, highScore.position.y, 50, BLACK);
-  }
-  if (collisionFlag) {
+  } else
+    DrawText("PRESS SPACE TO START!", 500, 250, 50, PINK);
+  if (loseFlag) {
     DrawText("YOU LOSE!\nPRESS R TO RESTART", 600, 250, 50, PINK);
-    loseFlag = true;
   }
 }
 
@@ -337,13 +399,13 @@ void ChangeObstacle(Rectangle* obsSqr, Rectangle* obsRec, Rectangle* obsBird) {
   int random = GetRandomValue(0, 90);
   if (random <= 30) {
     obstacle.recPtr = obsSqr;
-    obstacle.TexturePtr = &obstacleSqrTexture;
+    obstacle.texturePtr = &obstacleSqrTexture;
   } else if (random > 30 && random <= 60) {
     obstacle.recPtr = obsRec;
-    obstacle.TexturePtr = &obstacleRecTexture;
+    obstacle.texturePtr = &obstacleRecTexture;
   } else {
     obstacle.recPtr = obsBird;
-    obstacle.TexturePtr = &obstacleBirdTexture;
+    obstacle.texturePtr = &obstacleBirdTexture;
   }
   obstacleSwitch = false;
 }
